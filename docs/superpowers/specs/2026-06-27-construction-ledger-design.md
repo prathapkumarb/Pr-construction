@@ -99,8 +99,13 @@ access" screen. Role determines the app shell shown.
 - Suppliers: list with Amount / Given / Balance; detail view (deliveries +
   payments); edit supplier details; **merge a duplicate supplier into the
   correct one** (reassigns deliveries & payments, deletes the duplicate).
-- Deliveries: see all; set/edit price per delivery → creates line total.
-- Payments: record a payment ("Given") to a supplier.
+- Deliveries: see all; set/edit price per delivery → creates line total;
+  **edit or delete any delivery record** (supplier, material, quantity, date).
+- Payments: record a payment ("Given") to a supplier; **edit or delete** any
+  payment.
+- Records editing: the admin can correct/delete deliveries, payments, supplier
+  details, and materials. Deleting a delivery also removes its
+  `deliveryFinancials`. (Supervisors cannot edit/delete — create only.)
 - Reports: period selector — day / week / bi-monthly / monthly / custom range —
   showing all of: total purchases/spend (with trend), breakdown by supplier,
   breakdown by material, payments & outstanding balances. Plus a chart and
