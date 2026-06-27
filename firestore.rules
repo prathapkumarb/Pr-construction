@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function roleOf() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    function isAdmin() {
+      return isSignedIn() && roleOf() == 'admin';
+    }
+    function isStaff() {
+      return isSignedIn() && (roleOf() == 'admin' || roleOf() == 'supervisor');
+    }
+
+    // User profiles. Users may read their own doc and create it (as pending)
+    // on first login. Only admins can read everyone or change roles.
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isSignedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.role == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    // Suppliers & materials: staff can read and create on the fly.
+    // Only admins can edit details / delete (used by merge).
+    match /suppliers/{id} {
+      allow read, create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+    match /materials/{id} {
+      allow read, create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+
+    // Deliveries: physical facts, no money. Staff read & create.
+    // Admin can edit/reassign (used by supplier merge) and delete.
+    match /deliveries/{id} {
+      allow read, create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+
+    // MONEY — admin only at the data layer. Supervisors cannot read these.
+    match /deliveryFinancials/{id} {
+      allow read, write: if isAdmin();
+    }
+    match /payments/{id} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
