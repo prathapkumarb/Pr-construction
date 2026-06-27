@@ -9,6 +9,9 @@ import type { Material, Supplier } from "@/lib/types";
 import { suppliersQuery, createSupplier } from "@/services/suppliers";
 import { materialsQuery, createMaterial } from "@/services/materials";
 import { createDelivery } from "@/services/deliveries";
+import { setDeliveryPrice } from "@/services/financials";
+import { lineTotal } from "@/lib/ledger";
+import { formatInr } from "@/lib/format";
 import { SupplierPicker } from "@/components/pickers/SupplierPicker";
 import { MaterialPicker } from "@/components/pickers/MaterialPicker";
 import { Button } from "@/components/ui/button";
@@ -17,9 +20,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AddDeliveryPage() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, role } = useAuth();
   const navigate = useNavigate();
   const uid = firebaseUser!.uid;
+  const isAdmin = role === "admin";
 
   const sQuery = useMemo(() => suppliersQuery(), []);
   const mQuery = useMemo(() => materialsQuery(), []);
@@ -30,10 +34,13 @@ export default function AddDeliveryPage() {
   const [material, setMaterial] = useState<Material | null>(null);
   const [quantity, setQuantity] = useState("");
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [price, setPrice] = useState("");
   const [saving, setSaving] = useState(false);
 
   const qtyNum = Number(quantity);
+  const priceNum = Number(price);
   const valid = supplier && material && quantity !== "" && qtyNum > 0 && date;
+  const previewTotal = isAdmin && priceNum > 0 && qtyNum > 0 ? lineTotal(qtyNum, priceNum) : null;
 
   async function handleCreateSupplier(name: string) {
     const id = await createSupplier(name, uid);
@@ -51,7 +58,7 @@ export default function AddDeliveryPage() {
     if (!valid) return;
     setSaving(true);
     try {
-      await createDelivery(
+      const deliveryId = await createDelivery(
         {
           supplierId: supplier!.id,
           supplierName: supplier!.name,
@@ -63,6 +70,9 @@ export default function AddDeliveryPage() {
         },
         uid,
       );
+      if (isAdmin && priceNum > 0) {
+        await setDeliveryPrice(deliveryId, priceNum, qtyNum);
+      }
       toast.success("Delivery recorded");
       navigate("/deliveries");
     } catch {
@@ -130,6 +140,31 @@ export default function AddDeliveryPage() {
               />
             </div>
           </div>
+
+          {isAdmin && (
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              <Label htmlFor="price">
+                Price per {material?.unit ?? "unit"} (₹) — optional
+              </Label>
+              <Input
+                id="price"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="any"
+                placeholder="Leave blank to price later"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="h-11"
+              />
+              {previewTotal !== null && (
+                <p className="text-sm text-muted-foreground">
+                  Line total:{" "}
+                  <span className="font-semibold text-foreground">{formatInr(previewTotal)}</span>
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

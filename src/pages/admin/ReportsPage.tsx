@@ -11,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -35,6 +42,7 @@ export default function ReportsPage() {
   const today = useMemo(() => new Date(), []);
   const [customStart, setCustomStart] = useState(format(startOfMonth(today), "yyyy-MM-dd"));
   const [customEnd, setCustomEnd] = useState(format(today, "yyyy-MM-dd"));
+  const [supplierId, setSupplierId] = useState("all");
   const [exporting, setExporting] = useState(false);
 
   const supplierNames = useMemo(
@@ -47,8 +55,9 @@ export default function ReportsPage() {
     return computeReport(
       { deliveries, financials, payments, supplierNames, perSupplier },
       range,
+      { supplierId: supplierId === "all" ? undefined : supplierId },
     );
-  }, [preset, today, customStart, customEnd, deliveries, financials, payments, supplierNames, perSupplier]);
+  }, [preset, today, customStart, customEnd, supplierId, deliveries, financials, payments, supplierNames, perSupplier]);
 
   async function handleExport() {
     setExporting(true);
@@ -116,6 +125,23 @@ export default function ReportsPage() {
         </div>
       )}
 
+      <div className="space-y-1">
+        <Label className="text-xs">Supplier</Label>
+        <Select value={supplierId} onValueChange={setSupplierId}>
+          <SelectTrigger className="h-11">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All suppliers</SelectItem>
+            {suppliers.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <p className="text-xs text-muted-foreground">
         {report.range.start} → {report.range.end}
       </p>
@@ -152,38 +178,61 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      {/* By supplier */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">By supplier</CardTitle>
-        </CardHeader>
-        <CardContent className="px-0">
-          {report.bySupplier.length === 0 ? (
-            <p className="px-6 pb-2 text-sm text-muted-foreground">No data in period.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead className="text-right">Purchases</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.bySupplier.map((r) => (
-                  <TableRow key={r.supplierId}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatInr(r.spend)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatInr(r.payments)}</TableCell>
-                    <TableCell className="text-right tabular-nums text-amber-700">{formatInr(r.outstanding)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* By supplier (with per-supplier materials) */}
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold">By supplier</h2>
+      </div>
+      {report.bySupplier.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No data in period.</p>
+      ) : (
+        <div className="space-y-2">
+          {report.bySupplier.map((r) => (
+            <Card key={r.supplierId}>
+              <CardContent className="space-y-2 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium">{r.name}</p>
+                  <div className="text-right text-xs text-muted-foreground">
+                    <span>Balance</span>
+                    <p className="text-sm font-semibold tabular-nums text-amber-700">
+                      {formatInr(r.outstanding)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-4 text-xs text-muted-foreground">
+                  <span>Purchases <span className="font-medium text-foreground tabular-nums">{formatInr(r.spend)}</span></span>
+                  <span>Paid <span className="font-medium text-foreground tabular-nums">{formatInr(r.payments)}</span></span>
+                </div>
+                {r.materials.length > 0 && (
+                  <div className="rounded-md border bg-muted/30">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="h-8 text-xs">Material</TableHead>
+                          <TableHead className="h-8 text-right text-xs">Qty</TableHead>
+                          <TableHead className="h-8 text-right text-xs">Value</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {r.materials.map((m) => (
+                          <TableRow key={`${m.materialName}-${m.unit}`}>
+                            <TableCell className="py-1.5 text-sm">{m.materialName}</TableCell>
+                            <TableCell className="py-1.5 text-right text-sm tabular-nums">
+                              {formatNumber(m.quantity)} {m.unit}
+                            </TableCell>
+                            <TableCell className="py-1.5 text-right text-sm tabular-nums">
+                              {formatInr(m.value)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* By material */}
       <Card>

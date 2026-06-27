@@ -79,6 +79,27 @@ describe("computeReport", () => {
     const d10 = report.trend.find((t) => t.label === "10 Jun")!;
     expect(d10.value).toBe(33850);
   });
+
+  it("includes per-supplier material breakdown", () => {
+    const s1 = report.bySupplier.find((r) => r.supplierId === "s1")!;
+    const glue = s1.materials.find((m) => m.materialName === "Glue")!;
+    expect(glue.quantity).toBe(500);
+    expect(glue.value).toBe(32000);
+    expect(s1.materials).toHaveLength(1);
+  });
+});
+
+describe("computeReport with supplier filter", () => {
+  const june = buildRange("month", new Date("2026-06-15T12:00:00"));
+  const report = computeReport(input, june, { supplierId: "s1" });
+
+  it("restricts spend, payments and breakdowns to that supplier", () => {
+    expect(report.totalSpend).toBe(32000);
+    expect(report.totalPayments).toBe(20000);
+    expect(report.bySupplier).toHaveLength(1);
+    expect(report.bySupplier[0].supplierId).toBe("s1");
+    expect(report.byMaterial.every((m) => m.materialName === "Glue")).toBe(true);
+  });
 });
 
 describe("computeReport long range buckets monthly", () => {

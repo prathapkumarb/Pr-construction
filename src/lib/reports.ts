@@ -67,6 +67,8 @@ export interface SupplierBreakdownRow {
   payments: number;
   /** Current overall outstanding balance (not period-bound). */
   outstanding: number;
+  /** Materials this supplier delivered in the period. */
+  materials: MaterialBreakdownRow[];
 }
 
 export interface MaterialBreakdownRow {
@@ -95,16 +97,46 @@ export interface ReportInput {
   perSupplier: SupplierTotals[];
 }
 
-/** Aggregate ledger data into a report for the given date range. */
-export function computeReport(input: ReportInput, range: DateRange): ReportData {
+/** Accumulate quantity/value into a material map keyed by name+unit. */
+function addMaterial(
+  map: Map<string, MaterialBreakdownRow>,
+  materialName: string,
+  unit: string,
+  quantity: number,
+  value: number,
+) {
+  const key = `${materialName}__${unit}`;
+  let m = map.get(key);
+  if (!m) {
+    m = { materialName, unit, quantity: 0, value: 0 };
+    map.set(key, m);
+  }
+  m.quantity += quantity;
+  m.value += value;
+}
+
+/**
+ * Aggregate ledger data into a report for the given date range. Pass
+ * `options.supplierId` to restrict the whole report to one supplier.
+ */
+export function computeReport(
+  input: ReportInput,
+  range: DateRange,
+  options: { supplierId?: string } = {},
+): ReportData {
   const lineTotals = new Map(input.financials.map((f) => [f.id, f.lineTotal ?? 0]));
   const outstandingById = new Map(input.perSupplier.map((s) => [s.supplierId, s.balance]));
 
-  const periodDeliveries = input.deliveries.filter((d) => inRange(d.date, range));
-  const periodPayments = input.payments.filter((p) => inRange(p.date, range));
+  let periodDeliveries = input.deliveries.filter((d) => inRange(d.date, range));
+  let periodPayments = input.payments.filter((p) => inRange(p.date, range));
+  if (options.supplierId) {
+    periodDeliveries = periodDeliveries.filter((d) => d.supplierId === options.supplierId);
+    periodPayments = periodPayments.filter((p) => p.supplierId === options.supplierId);
+  }
 
   let totalSpend = 0;
   const supplierMap = new Map<string, SupplierBreakdownRow>();
+  const supplierMaterials = new Map<string, Map<string, MaterialBreakdownRow>>();
   const materialMap = new Map<string, MaterialBreakdownRow>();
 
   function supplierRow(id: string): SupplierBreakdownRow {
@@ -116,8 +148,10 @@ export function computeReport(input: ReportInput, range: DateRange): ReportData 
         spend: 0,
         payments: 0,
         outstanding: outstandingById.get(id) ?? 0,
+        materials: [],
       };
       supplierMap.set(id, row);
+      supplierMaterials.set(id, new Map());
     }
     return row;
   }
@@ -126,21 +160,20 @@ export function computeReport(input: ReportInput, range: DateRange): ReportData 
     const value = lineTotals.get(d.id) ?? 0;
     totalSpend += value;
     supplierRow(d.supplierId).spend += value;
-
-    const key = `${d.materialName}__${d.unit}`;
-    let m = materialMap.get(key);
-    if (!m) {
-      m = { materialName: d.materialName, unit: d.unit, quantity: 0, value: 0 };
-      materialMap.set(key, m);
-    }
-    m.quantity += d.quantity;
-    m.value += value;
+    addMaterial(materialMap, d.materialName, d.unit, d.quantity, value);
+    addMaterial(supplierMaterials.get(d.supplierId)!, d.materialName, d.unit, d.quantity, value);
   }
 
   let totalPayments = 0;
   for (const p of periodPayments) {
     totalPayments += p.amount;
     supplierRow(p.supplierId).payments += p.amount;
+  }
+
+  for (const [id, row] of supplierMap) {
+    row.materials = [...(supplierMaterials.get(id)?.values() ?? [])].sort(
+      (a, b) => b.value - a.value,
+    );
   }
 
   return {

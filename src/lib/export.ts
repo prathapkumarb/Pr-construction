@@ -38,6 +38,19 @@ export async function exportReportToExcel(report: ReportData): Promise<void> {
   );
   XLSX.utils.book_append_sheet(wb, byMaterial, "By material");
 
+  const supplierMaterials = XLSX.utils.json_to_sheet(
+    report.bySupplier.flatMap((s) =>
+      s.materials.map((m) => ({
+        Supplier: s.name,
+        Material: m.materialName,
+        Unit: m.unit,
+        Quantity: m.quantity,
+        "Value (₹)": m.value,
+      })),
+    ),
+  );
+  XLSX.utils.book_append_sheet(wb, supplierMaterials, "Supplier materials");
+
   const payments = XLSX.utils.json_to_sheet(
     report.payments.map((p) => ({
       Date: p.date,
