@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>flux-1b85e — Firebase + Tailwind</title>
+    <meta name="description" content="Static site deployed on Firebase Hosting, styled with Tailwind and the shadcn design system." />
+
+    <!-- Tailwind (Play CDN — prototyping; swap for a CLI build before production) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          container: { center: true, padding: "2rem", screens: { "2xl": "1400px" } },
+          extend: {
+            colors: {
+              border: "hsl(var(--border))",
+              input: "hsl(var(--input))",
+              ring: "hsl(var(--ring))",
+              background: "hsl(var(--background))",
+              foreground: "hsl(var(--foreground))",
+              primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+              secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
+              muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+              accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
+              card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
+            },
+            borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
+            fontFamily: { sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"] },
+          },
+        },
+      };
+    </script>
+
+    <!-- shadcn "New York" design tokens (neutral / zinc) -->
+    <style>
+      :root {
+        --background: 0 0% 100%;
+        --foreground: 240 10% 3.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 240 10% 3.9%;
+        --primary: 240 5.9% 10%;
+        --primary-foreground: 0 0% 98%;
+        --secondary: 240 4.8% 95.9%;
+        --secondary-foreground: 240 5.9% 10%;
+        --muted: 240 4.8% 95.9%;
+        --muted-foreground: 240 3.8% 46.1%;
+        --accent: 240 4.8% 95.9%;
+        --accent-foreground: 240 5.9% 10%;
+        --border: 240 5.9% 90%;
+        --input: 240 5.9% 90%;
+        --ring: 240 5.9% 10%;
+        --radius: 0.5rem;
+      }
+      .dark {
+        --background: 240 10% 3.9%;
+        --foreground: 0 0% 98%;
+        --card: 240 10% 3.9%;
+        --card-foreground: 0 0% 98%;
+        --primary: 0 0% 98%;
+        --primary-foreground: 240 5.9% 10%;
+        --secondary: 240 3.7% 15.9%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 240 3.7% 15.9%;
+        --muted-foreground: 240 5% 64.9%;
+        --accent: 240 3.7% 15.9%;
+        --accent-foreground: 0 0% 98%;
+        --border: 240 3.7% 15.9%;
+        --input: 240 3.7% 15.9%;
+        --ring: 240 4.9% 83.9%;
+      }
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+    </style>
+  </head>
+
+  <body class="min-h-screen bg-background font-sans text-foreground antialiased">
+    <div class="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 py-16">
+      <!-- Card -->
+      <div class="w-full rounded-lg border border-border bg-card text-card-foreground shadow-sm">
+        <!-- Card header -->
+        <div class="flex flex-col space-y-1.5 p-6">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex h-2.5 w-2.5 rounded-full bg-orange-500"></span>
+            <span class="text-xs font-medium uppercase tracking-wider text-muted-foreground">flux-1b85e</span>
+          </div>
+          <h1 class="text-2xl font-semibold leading-none tracking-tight">It works.</h1>
+          <p class="text-sm text-muted-foreground">
+            Plain HTML, styled with Tailwind and the shadcn design system, served from Firebase Hosting.
+          </p>
+        </div>
+
+        <!-- Card content -->
+        <div class="space-y-4 p-6 pt-0">
+          <div class="flex items-center justify-between rounded-md border border-border bg-muted/40 px-4 py-3">
+            <span class="text-sm font-medium">Firebase SDK</span>
+            <span id="fb-status" class="text-sm text-muted-foreground">checking…</span>
+          </div>
+          <p class="text-sm text-muted-foreground">
+            Authentication and Firestore are not wired up yet — the SDK is loaded and ready to add them next.
+          </p>
+        </div>
+
+        <!-- Card footer -->
+        <div class="flex items-center gap-3 p-6 pt-0">
+          <!-- Primary button -->
+          <a
+            href="https://console.firebase.google.com/project/flux-1b85e/overview"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            Open Firebase Console
+          </a>
+          <!-- Outline button (theme toggle) -->
+          <button
+            id="theme-toggle"
+            class="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            Toggle theme
+          </button>
+        </div>
+      </div>
+
+      <p class="mt-6 text-center text-xs text-muted-foreground">
+        Deployed from local with <code class="rounded bg-muted px-1 py-0.5">npm run deploy</code>
+      </p>
+    </div>
+
+    <!-- Theme toggle -->
+    <script>
+      const toggle = document.getElementById("theme-toggle");
+      toggle.addEventListener("click", () => document.documentElement.classList.toggle("dark"));
+    </script>
+
+    <!-- Firebase init -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { firebaseConfig } from "./firebase-config.js";
+
+      const statusEl = document.getElementById("fb-status");
+      try {
+        const app = initializeApp(firebaseConfig);
+        statusEl.textContent = "initialized ✓";
+        statusEl.className = "text-sm font-medium text-green-600 dark:text-green-400";
+      } catch (err) {
+        statusEl.textContent = "config needed";
+        statusEl.className = "text-sm font-medium text-orange-600 dark:text-orange-400";
+        console.error("Firebase init failed:", err);
+      }
+    </script>
+  </body>
+</html>
