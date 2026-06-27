@@ -7,6 +7,7 @@ import DeliveriesPage from "@/pages/DeliveriesPage";
 import AddDeliveryPage from "@/pages/AddDeliveryPage";
 import DashboardPage from "@/pages/admin/DashboardPage";
 import SuppliersPage from "@/pages/admin/SuppliersPage";
+import SupplierDetailPage from "@/pages/admin/SupplierDetailPage";
 import PaymentsPage from "@/pages/admin/PaymentsPage";
 import ReportsPage from "@/pages/admin/ReportsPage";
 import UsersPage from "@/pages/admin/UsersPage";
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
             children: [
               { path: "/dashboard", element: <DashboardPage /> },
               { path: "/suppliers", element: <SuppliersPage /> },
+              { path: "/suppliers/:id", element: <SupplierDetailPage /> },
               { path: "/payments", element: <PaymentsPage /> },
               { path: "/reports", element: <ReportsPage /> },
               { path: "/users", element: <UsersPage /> },
