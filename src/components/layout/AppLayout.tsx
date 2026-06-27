@@ -6,6 +6,7 @@ import {
   Wallet,
   BarChart3,
   UserCog,
+  Boxes,
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -51,14 +52,24 @@ export function AppLayout() {
         </div>
         <div className="flex items-center gap-1">
           {role === "admin" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Users"
-              onClick={() => navigate("/users")}
-            >
-              <UserCog className="h-5 w-5" />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Materials"
+                onClick={() => navigate("/materials")}
+              >
+                <Boxes className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Users"
+                onClick={() => navigate("/users")}
+              >
+                <UserCog className="h-5 w-5" />
+              </Button>
+            </>
           )}
           <Button variant="ghost" size="icon" aria-label="Sign out" onClick={() => signOut()}>
             <LogOut className="h-5 w-5" />

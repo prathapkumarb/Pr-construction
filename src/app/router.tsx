@@ -11,6 +11,7 @@ import SupplierDetailPage from "@/pages/admin/SupplierDetailPage";
 import PaymentsPage from "@/pages/admin/PaymentsPage";
 import ReportsPage from "@/pages/admin/ReportsPage";
 import UsersPage from "@/pages/admin/UsersPage";
+import MaterialsPage from "@/pages/admin/MaterialsPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
               { path: "/payments", element: <PaymentsPage /> },
               { path: "/reports", element: <ReportsPage /> },
               { path: "/users", element: <UsersPage /> },
+              { path: "/materials", element: <MaterialsPage /> },
             ],
           },
         ],
