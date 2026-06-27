@@ -27,6 +27,7 @@ const adminNav: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard },
   { to: "/deliveries", label: "Deliveries", icon: Truck },
   { to: "/suppliers", label: "Suppliers", icon: Users },
+  { to: "/materials", label: "Materials", icon: Boxes },
   { to: "/payments", label: "Payments", icon: Wallet },
   { to: "/reports", label: "Reports", icon: BarChart3 },
 ];
@@ -52,24 +53,14 @@ export function AppLayout() {
         </div>
         <div className="flex items-center gap-1">
           {role === "admin" && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Materials"
-                onClick={() => navigate("/materials")}
-              >
-                <Boxes className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Users"
-                onClick={() => navigate("/users")}
-              >
-                <UserCog className="h-5 w-5" />
-              </Button>
-            </>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Users"
+              onClick={() => navigate("/users")}
+            >
+              <UserCog className="h-5 w-5" />
+            </Button>
           )}
           <Button variant="ghost" size="icon" aria-label="Sign out" onClick={() => signOut()}>
             <LogOut className="h-5 w-5" />
