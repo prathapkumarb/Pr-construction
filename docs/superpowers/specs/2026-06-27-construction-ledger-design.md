@@ -54,6 +54,24 @@ merely hidden in the UI.
 - Suppliers and materials are created on the fly during delivery entry (name
   only); the admin can enrich supplier details later.
 
+## Supplier de-duplication & merge
+
+Because supervisors create suppliers on the fly, misspellings will produce
+near-duplicate suppliers (e.g. "Prathic" vs "Prathick"). Two mechanisms:
+
+1. **Prevent at entry (supervisor):** the supplier picker does a fuzzy match on
+   existing names and surfaces suggestions ("Did you mean *Prathic*?") before
+   the supervisor creates a new one, so they reuse the existing supplier.
+2. **Merge (admin only):** an admin selects a duplicate (source) supplier and a
+   correct (target) supplier, then merges. The app:
+   - reassigns every `deliveries` doc with the source `supplierId` to the
+     target (`supplierId` + `supplierName`),
+   - reassigns every `payments` doc from source to target,
+   - deletes the source `supplier` doc.
+   `deliveryFinancials` are keyed by delivery ID, so they follow automatically.
+   Balances of the target supplier recombine correctly with no extra work.
+   Done as Firestore batched writes (chunked if > 500 ops).
+
 ## Security rules (intent)
 
 - Helper: `role()` = `get(/users/$(uid)).data.role`.
@@ -70,15 +88,17 @@ merely hidden in the UI.
 access" screen. Role determines the app shell shown.
 
 **Supervisor** (no money anywhere):
-- Add Delivery: pick or create supplier, pick or create material + unit, enter
-  quantity, date (defaults to today). Large tap targets, dropdowns with recent
-  items, minimal typing.
+- Add Delivery: pick or create supplier (with fuzzy "did you mean?" suggestions
+  to avoid duplicates), pick or create material + unit, enter quantity, date
+  (defaults to today). Large tap targets, dropdowns with recent items, minimal
+  typing.
 - Delivery list (recent entries).
 
 **Admin (owner):**
 - Dashboard: total spend, total outstanding balance, quick stats.
 - Suppliers: list with Amount / Given / Balance; detail view (deliveries +
-  payments); edit supplier details.
+  payments); edit supplier details; **merge a duplicate supplier into the
+  correct one** (reassigns deliveries & payments, deletes the duplicate).
 - Deliveries: see all; set/edit price per delivery → creates line total.
 - Payments: record a payment ("Given") to a supplier.
 - Reports: period selector — day / week / bi-monthly / monthly / custom range —
@@ -114,7 +134,7 @@ export so it stays familiar to a spreadsheet user.
 1. **Phase 1** — Project setup (Vite/React/Tailwind/shadcn/Firebase), auth +
    roles + pending gate, suppliers/materials, supervisor delivery entry.
 2. **Phase 2** — Admin: pricing per delivery, payments, supplier balances,
-   dashboard, supplier detail/edit.
+   dashboard, supplier detail/edit, and supplier merge (de-duplication).
 3. **Phase 3** — Reports (period filters, 4 breakdowns, chart) + Excel/CSV
    export. Polish, security-rules hardening, deploy.
 
