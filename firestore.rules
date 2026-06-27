@@ -44,6 +44,13 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // Site locations: non-financial master data. Staff can read, create, reactivate.
+    // Only admins can delete.
+    match /sites/{id} {
+      allow read, create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
     // MONEY — admin only at the data layer. Supervisors cannot read these.
     match /deliveryFinancials/{id} {
       allow read, write: if isAdmin();

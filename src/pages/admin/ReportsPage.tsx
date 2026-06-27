@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { BarChart3, Download, Loader2, IndianRupee, Wallet } from "lucide-react";
+import { BarChart3, Download, Loader2, IndianRupee, Wallet, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 import { useLedger } from "@/hooks/useLedger";
 import { buildRange, computeReport, type PeriodPreset } from "@/lib/reports";
 import { exportReportToExcel } from "@/lib/export";
@@ -36,7 +37,36 @@ const PRESETS: { value: PeriodPreset; label: string }[] = [
   { value: "custom", label: "Custom" },
 ];
 
+interface ReportPrefs {
+  showSummary: boolean;
+  showTrend: boolean;
+  showBySupplier: boolean;
+  showByMaterial: boolean;
+}
+
+const DEFAULT_PREFS: ReportPrefs = {
+  showSummary: true,
+  showTrend: true,
+  showBySupplier: true,
+  showByMaterial: true,
+};
+
+function loadPrefs(key: string): ReportPrefs {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
+  } catch {}
+  return { ...DEFAULT_PREFS };
+}
+
+function savePrefs(key: string, prefs: ReportPrefs) {
+  localStorage.setItem(key, JSON.stringify(prefs));
+}
+
 export default function ReportsPage() {
+  const { firebaseUser } = useAuth();
+  const PREFS_KEY = `flux_report_prefs_${firebaseUser?.uid ?? "guest"}`;
+
   const { deliveries, financials, payments, suppliers, perSupplier, loading } = useLedger();
   const [preset, setPreset] = useState<PeriodPreset>("month");
   const today = useMemo(() => new Date(), []);
@@ -44,6 +74,16 @@ export default function ReportsPage() {
   const [customEnd, setCustomEnd] = useState(format(today, "yyyy-MM-dd"));
   const [supplierId, setSupplierId] = useState("all");
   const [exporting, setExporting] = useState(false);
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [prefs, setPrefs] = useState<ReportPrefs>(() => loadPrefs(PREFS_KEY));
+
+  function updatePref<K extends keyof ReportPrefs>(key: K, value: ReportPrefs[K]) {
+    setPrefs((prev) => {
+      const next = { ...prev, [key]: value };
+      savePrefs(PREFS_KEY, next);
+      return next;
+    });
+  }
 
   const supplierNames = useMemo(
     () => new Map(suppliers.map((s) => [s.id, s.name])),
@@ -88,11 +128,51 @@ export default function ReportsPage() {
           <BarChart3 className="h-5 w-5" />
           <h1 className="text-lg font-semibold">Reports</h1>
         </div>
-        <Button size="sm" variant="outline" onClick={handleExport} disabled={exporting}>
-          {exporting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-          Excel
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant={showCustomize ? "secondary" : "ghost"}
+            onClick={() => setShowCustomize((v) => !v)}
+            aria-label="Customize sections"
+          >
+            <Settings2 className="mr-1 h-4 w-4" />
+            Columns
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExport} disabled={exporting}>
+            {exporting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
+            Excel
+          </Button>
+        </div>
       </div>
+
+      {/* Column customizer */}
+      {showCustomize && (
+        <Card>
+          <CardContent className="p-3">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">Visible sections — auto-saved</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { key: "showSummary", label: "Summary cards" },
+                  { key: "showTrend", label: "Trend chart" },
+                  { key: "showBySupplier", label: "By supplier" },
+                  { key: "showByMaterial", label: "By material" },
+                ] as { key: keyof ReportPrefs; label: string }[]
+              ).map(({ key, label }) => (
+                <label key={key} className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    checked={prefs[key]}
+                    onChange={(e) => updatePref(key, e.target.checked)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Period selector */}
       <div className="flex flex-wrap gap-1.5">
@@ -147,125 +227,135 @@ export default function ReportsPage() {
       </p>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <IndianRupee className="h-4 w-4" />
-              <span className="text-xs font-medium">Purchases</span>
-            </div>
-            <p className="mt-1 text-xl font-semibold tabular-nums">{formatInr(report.totalSpend)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Wallet className="h-4 w-4" />
-              <span className="text-xs font-medium">Payments</span>
-            </div>
-            <p className="mt-1 text-xl font-semibold tabular-nums">{formatInr(report.totalPayments)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Trend chart */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Purchases trend</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <BarChart data={report.trend} />
-        </CardContent>
-      </Card>
-
-      {/* By supplier (with per-supplier materials) */}
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold">By supplier</h2>
-      </div>
-      {report.bySupplier.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No data in period.</p>
-      ) : (
-        <div className="space-y-2">
-          {report.bySupplier.map((r) => (
-            <Card key={r.supplierId}>
-              <CardContent className="space-y-2 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium">{r.name}</p>
-                  <div className="text-right text-xs text-muted-foreground">
-                    <span>Balance</span>
-                    <p className="text-sm font-semibold tabular-nums text-amber-700">
-                      {formatInr(r.outstanding)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-4 text-xs text-muted-foreground">
-                  <span>Purchases <span className="font-medium text-foreground tabular-nums">{formatInr(r.spend)}</span></span>
-                  <span>Paid <span className="font-medium text-foreground tabular-nums">{formatInr(r.payments)}</span></span>
-                </div>
-                {r.materials.length > 0 && (
-                  <div className="rounded-md border bg-muted/30">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="h-8 text-xs">Material</TableHead>
-                          <TableHead className="h-8 text-right text-xs">Qty</TableHead>
-                          <TableHead className="h-8 text-right text-xs">Value</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {r.materials.map((m) => (
-                          <TableRow key={`${m.materialName}-${m.unit}`}>
-                            <TableCell className="py-1.5 text-sm">{m.materialName}</TableCell>
-                            <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                              {formatNumber(m.quantity)} {m.unit}
-                            </TableCell>
-                            <TableCell className="py-1.5 text-right text-sm tabular-nums">
-                              {formatInr(m.value)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+      {prefs.showSummary && (
+        <div className="grid grid-cols-2 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <IndianRupee className="h-4 w-4" />
+                <span className="text-xs font-medium">Purchases</span>
+              </div>
+              <p className="mt-1 text-xl font-semibold tabular-nums">{formatInr(report.totalSpend)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Wallet className="h-4 w-4" />
+                <span className="text-xs font-medium">Payments</span>
+              </div>
+              <p className="mt-1 text-xl font-semibold tabular-nums">{formatInr(report.totalPayments)}</p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
-      {/* By material */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">By material</CardTitle>
-        </CardHeader>
-        <CardContent className="px-0">
-          {report.byMaterial.length === 0 ? (
-            <p className="px-6 pb-2 text-sm text-muted-foreground">No data in period.</p>
+      {/* Trend chart */}
+      {prefs.showTrend && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Purchases trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BarChart data={report.trend} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* By supplier (with per-supplier materials) */}
+      {prefs.showBySupplier && (
+        <>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold">By supplier</h2>
+          </div>
+          {report.bySupplier.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No data in period.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Material</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {report.byMaterial.map((r) => (
-                  <TableRow key={`${r.materialName}-${r.unit}`}>
-                    <TableCell className="font-medium">{r.materialName}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(r.quantity)} {r.unit}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatInr(r.value)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-2">
+              {report.bySupplier.map((r) => (
+                <Card key={r.supplierId}>
+                  <CardContent className="space-y-2 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium">{r.name}</p>
+                      <div className="text-right text-xs text-muted-foreground">
+                        <span>Balance</span>
+                        <p className="text-sm font-semibold tabular-nums text-amber-700">
+                          {formatInr(r.outstanding)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 text-xs text-muted-foreground">
+                      <span>Purchases <span className="font-medium text-foreground tabular-nums">{formatInr(r.spend)}</span></span>
+                      <span>Paid <span className="font-medium text-foreground tabular-nums">{formatInr(r.payments)}</span></span>
+                    </div>
+                    {r.materials.length > 0 && (
+                      <div className="rounded-md border bg-muted/30">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="h-8 text-xs">Material</TableHead>
+                              <TableHead className="h-8 text-right text-xs">Qty</TableHead>
+                              <TableHead className="h-8 text-right text-xs">Value</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {r.materials.map((m) => (
+                              <TableRow key={`${m.materialName}-${m.unit}`}>
+                                <TableCell className="py-1.5 text-sm">{m.materialName}</TableCell>
+                                <TableCell className="py-1.5 text-right text-sm tabular-nums">
+                                  {formatNumber(m.quantity)} {m.unit}
+                                </TableCell>
+                                <TableCell className="py-1.5 text-right text-sm tabular-nums">
+                                  {formatInr(m.value)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </>
+      )}
+
+      {/* By material */}
+      {prefs.showByMaterial && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">By material</CardTitle>
+          </CardHeader>
+          <CardContent className="px-0">
+            {report.byMaterial.length === 0 ? (
+              <p className="px-6 pb-2 text-sm text-muted-foreground">No data in period.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead className="text-right">Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {report.byMaterial.map((r) => (
+                    <TableRow key={`${r.materialName}-${r.unit}`}>
+                      <TableCell className="font-medium">{r.materialName}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatNumber(r.quantity)} {r.unit}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatInr(r.value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

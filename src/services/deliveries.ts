@@ -23,6 +23,7 @@ export interface NewDelivery {
   unit: string;
   quantity: number;
   date: string; // yyyy-MM-dd
+  siteName?: string;
 }
 
 /** Record a physical delivery. No money is stored here. */

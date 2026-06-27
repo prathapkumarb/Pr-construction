@@ -1,10 +1,12 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import type { Payment, Supplier } from "@/lib/types";
+import type { SupplierTotals } from "@/lib/ledger";
 import { createPayment, updatePayment, deletePayment } from "@/services/payments";
+import { formatInr } from "@/lib/format";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +35,8 @@ interface Props {
   defaultSupplierId?: string;
   /** Lock the supplier field (when recording from a supplier's page). */
   lockSupplier?: boolean;
+  /** Ledger totals per supplier — used to show balance info. */
+  perSupplier?: SupplierTotals[];
 }
 
 export function PaymentDialog({
@@ -41,6 +45,7 @@ export function PaymentDialog({
   payment,
   defaultSupplierId,
   lockSupplier,
+  perSupplier = [],
 }: Props) {
   const { firebaseUser } = useAuth();
   const [open, setOpen] = useState(false);
@@ -57,6 +62,12 @@ export function PaymentDialog({
     setDate(payment?.date ?? format(new Date(), "yyyy-MM-dd"));
     setNote(payment?.note ?? "");
   }, [open, payment, defaultSupplierId]);
+
+  const totalsMap = useMemo(
+    () => new Map(perSupplier.map((t) => [t.supplierId, t])),
+    [perSupplier],
+  );
+  const selectedTotals = supplierId ? totalsMap.get(supplierId) : undefined;
 
   const amountNum = Number(amount);
   const valid = supplierId && amount !== "" && amountNum > 0 && date;
@@ -91,6 +102,8 @@ export function PaymentDialog({
     }
   }
 
+  const activeSuppliers = useMemo(() => suppliers.filter((s) => s.active !== false), [suppliers]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
@@ -106,7 +119,7 @@ export function PaymentDialog({
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
               <SelectContent>
-                {suppliers.map((s) => (
+                {activeSuppliers.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name}
                   </SelectItem>
@@ -114,6 +127,27 @@ export function PaymentDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {selectedTotals && (
+            <div className="rounded-md border bg-muted/30 p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">{selectedTotals.name} — current balance</p>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[10px] text-muted-foreground">Purchases</p>
+                  <p className="text-sm font-semibold tabular-nums">{formatInr(selectedTotals.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground">Paid</p>
+                  <p className="text-sm font-semibold tabular-nums">{formatInr(selectedTotals.given)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground">Balance</p>
+                  <p className="text-sm font-semibold tabular-nums text-amber-700">{formatInr(selectedTotals.balance)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="amount">Amount (₹)</Label>

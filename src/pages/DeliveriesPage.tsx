@@ -5,9 +5,10 @@ import { Plus, Truck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCollectionData } from "@/hooks/useCollectionData";
 import { useLedger } from "@/hooks/useLedger";
-import type { Delivery, Material } from "@/lib/types";
+import type { Delivery, Material, Site } from "@/lib/types";
 import { deliveriesQuery } from "@/services/deliveries";
 import { materialsQuery } from "@/services/materials";
+import { sitesQuery } from "@/services/sites";
 import { formatInr, formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -83,6 +84,9 @@ function SupervisorDeliveries() {
                 <div className="min-w-0">
                   <p className="truncate font-medium">{d.supplierName}</p>
                   <p className="truncate text-sm text-muted-foreground">{d.materialName}</p>
+                  {d.siteName && (
+                    <p className="truncate text-xs text-muted-foreground">{d.siteName}</p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="font-semibold tabular-nums">
@@ -103,7 +107,9 @@ function SupervisorDeliveries() {
 function AdminDeliveries() {
   const { deliveries, financialsById, suppliers, loading } = useLedger();
   const mQuery = useMemo(() => materialsQuery(), []);
+  const siteQ = useMemo(() => sitesQuery(), []);
   const { data: materials } = useCollectionData<Material>(mQuery);
+  const { data: sites } = useCollectionData<Site>(siteQ);
 
   return (
     <div className="space-y-4">
@@ -123,6 +129,7 @@ function AdminDeliveries() {
                 financial={fin}
                 suppliers={suppliers}
                 materials={materials}
+                sites={sites}
                 trigger={
                   <Card className="cursor-pointer transition-colors hover:bg-accent">
                     <CardContent className="flex items-center justify-between gap-3 p-3">
@@ -131,6 +138,9 @@ function AdminDeliveries() {
                         <p className="truncate text-sm text-muted-foreground">
                           {d.materialName} · {formatNumber(d.quantity)} {d.unit}
                         </p>
+                        {d.siteName && (
+                          <p className="truncate text-xs text-muted-foreground">{d.siteName}</p>
+                        )}
                       </div>
                       <div className="text-right">
                         {fin ? (

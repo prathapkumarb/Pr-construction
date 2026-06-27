@@ -5,15 +5,17 @@ import { Loader2, PackagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useCollectionData } from "@/hooks/useCollectionData";
-import type { Material, Supplier } from "@/lib/types";
-import { suppliersQuery, createSupplier } from "@/services/suppliers";
+import type { Material, Site, Supplier } from "@/lib/types";
+import { suppliersQuery, createSupplier, setSupplierActive } from "@/services/suppliers";
 import { materialsQuery, createMaterial } from "@/services/materials";
 import { createDelivery } from "@/services/deliveries";
+import { sitesQuery, createSite, setSiteActive } from "@/services/sites";
 import { setDeliveryPrice } from "@/services/financials";
 import { lineTotal } from "@/lib/ledger";
 import { formatInr } from "@/lib/format";
 import { SupplierPicker } from "@/components/pickers/SupplierPicker";
 import { MaterialPicker } from "@/components/pickers/MaterialPicker";
+import { SiteNamePicker } from "@/components/pickers/SiteNamePicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,13 +29,16 @@ export default function AddDeliveryPage() {
 
   const sQuery = useMemo(() => suppliersQuery(), []);
   const mQuery = useMemo(() => materialsQuery(), []);
+  const siteQ = useMemo(() => sitesQuery(), []);
   const { data: suppliers } = useCollectionData<Supplier>(sQuery);
   const { data: materials } = useCollectionData<Material>(mQuery);
+  const { data: sites } = useCollectionData<Site>(siteQ);
 
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [material, setMaterial] = useState<Material | null>(null);
   const [quantity, setQuantity] = useState("");
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [siteName, setSiteName] = useState("");
   const [price, setPrice] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -44,8 +49,26 @@ export default function AddDeliveryPage() {
 
   async function handleCreateSupplier(name: string) {
     const id = await createSupplier(name, uid);
-    setSupplier({ id, name });
+    setSupplier({ id, name, active: true });
     toast.success(`Supplier “${name}” added`);
+  }
+
+  async function handleReactivateSupplier(s: Supplier) {
+    await setSupplierActive(s.id, true);
+    setSupplier(s);
+    toast.success(`${s.name} reactivated`);
+  }
+
+  async function handleCreateSite(name: string) {
+    await createSite(name, uid);
+    setSiteName(name);
+    toast.success(`Site “${name}” added`);
+  }
+
+  async function handleReactivateSite(site: Site) {
+    await setSiteActive(site.id, true);
+    setSiteName(site.name);
+    toast.success(`Site “${site.name}” reactivated`);
   }
 
   async function handleCreateMaterial(name: string, unit: string) {
@@ -67,6 +90,7 @@ export default function AddDeliveryPage() {
           unit: material!.unit,
           quantity: qtyNum,
           date,
+          siteName: siteName.trim() || undefined,
         },
         uid,
       );
@@ -101,6 +125,7 @@ export default function AddDeliveryPage() {
               value={supplier}
               onSelect={setSupplier}
               onCreate={handleCreateSupplier}
+              onReactivate={handleReactivateSupplier}
             />
           </div>
 
@@ -139,6 +164,17 @@ export default function AddDeliveryPage() {
                 className="h-11"
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Site name — optional</Label>
+            <SiteNamePicker
+              sites={sites}
+              value={siteName}
+              onChange={setSiteName}
+              onCreate={handleCreateSite}
+              onReactivate={handleReactivateSite}
+            />
           </div>
 
           {isAdmin && (

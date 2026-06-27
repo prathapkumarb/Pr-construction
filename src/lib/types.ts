@@ -17,6 +17,16 @@ export interface Supplier {
   address?: string;
   gstNumber?: string;
   notes?: string;
+  /** false = inactive; undefined/true = active (legacy docs treated as active) */
+  active?: boolean;
+  createdAt?: Timestamp;
+  createdBy?: string;
+}
+
+export interface Site {
+  id: string;
+  name: string;
+  active: boolean;
   createdAt?: Timestamp;
   createdBy?: string;
 }
@@ -39,6 +49,7 @@ export interface Delivery {
   quantity: number;
   /** ISO date string (yyyy-MM-dd) for the delivery day */
   date: string;
+  siteName?: string;
   createdBy: string;
   createdAt?: Timestamp;
 }

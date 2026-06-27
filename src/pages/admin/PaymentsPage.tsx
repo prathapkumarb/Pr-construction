@@ -17,7 +17,7 @@ function safeDate(value: string): string {
 }
 
 export default function PaymentsPage() {
-  const { suppliers, payments, loading } = useLedger();
+  const { suppliers, payments, perSupplier, loading } = useLedger();
   const nameById = useMemo(
     () => new Map(suppliers.map((s) => [s.id, s.name])),
     [suppliers],
@@ -32,6 +32,7 @@ export default function PaymentsPage() {
         </div>
         <PaymentDialog
           suppliers={suppliers}
+          perSupplier={perSupplier}
           trigger={
             <Button size="sm">
               <Plus className="mr-1 h-4 w-4" /> Record
@@ -59,6 +60,7 @@ export default function PaymentsPage() {
             <PaymentDialog
               key={p.id}
               suppliers={suppliers}
+              perSupplier={perSupplier}
               payment={p}
               trigger={
                 <Card className="cursor-pointer transition-colors hover:bg-accent">

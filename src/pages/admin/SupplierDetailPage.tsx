@@ -15,8 +15,9 @@ import {
 import { toast } from "sonner";
 import { useLedger } from "@/hooks/useLedger";
 import { useCollectionData } from "@/hooks/useCollectionData";
-import type { Material } from "@/lib/types";
+import type { Material, Site } from "@/lib/types";
 import { materialsQuery } from "@/services/materials";
+import { sitesQuery } from "@/services/sites";
 import { deleteSupplier } from "@/services/suppliers";
 import { formatInr, formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,9 @@ export default function SupplierDetailPage() {
   const navigate = useNavigate();
   const { suppliers, deliveries, payments, financialsById, perSupplier, loading } = useLedger();
   const mQuery = useMemo(() => materialsQuery(), []);
+  const siteQ = useMemo(() => sitesQuery(), []);
   const { data: materials } = useCollectionData<Material>(mQuery);
+  const { data: sites } = useCollectionData<Site>(siteQ);
 
   const supplier = suppliers.find((s) => s.id === id);
   const totals = perSupplier.find((t) => t.supplierId === id);
@@ -187,6 +190,7 @@ export default function SupplierDetailPage() {
                 financial={fin}
                 suppliers={suppliers}
                 materials={materials}
+                sites={sites}
                 trigger={
                   <Card className="cursor-pointer transition-colors hover:bg-accent">
                     <CardContent className="flex items-center justify-between gap-3 p-3">
@@ -195,6 +199,9 @@ export default function SupplierDetailPage() {
                         <p className="text-sm text-muted-foreground">
                           {formatNumber(d.quantity)} {d.unit} · {safeDate(d.date)}
                         </p>
+                        {d.siteName && (
+                          <p className="truncate text-xs text-muted-foreground">{d.siteName}</p>
+                        )}
                       </div>
                       {fin ? (
                         <p className="font-semibold tabular-nums">{formatInr(fin.lineTotal)}</p>
@@ -218,6 +225,7 @@ export default function SupplierDetailPage() {
         <h2 className="font-semibold">Payments</h2>
         <PaymentDialog
           suppliers={suppliers}
+          perSupplier={perSupplier}
           defaultSupplierId={supplier.id}
           lockSupplier
           trigger={
@@ -235,6 +243,7 @@ export default function SupplierDetailPage() {
             <PaymentDialog
               key={p.id}
               suppliers={suppliers}
+              perSupplier={perSupplier}
               payment={p}
               lockSupplier
               trigger={

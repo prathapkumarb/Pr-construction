@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 import type { Supplier } from "@/lib/types";
-import { updateSupplier } from "@/services/suppliers";
+import { createSupplier, updateSupplier } from "@/services/suppliers";
 import {
   Dialog,
   DialogContent,
@@ -17,10 +18,12 @@ import { Label } from "@/components/ui/label";
 
 interface Props {
   trigger: ReactNode;
-  supplier: Supplier;
+  /** Existing supplier to edit. Omit to open in create mode. */
+  supplier?: Supplier;
 }
 
 export function SupplierEditDialog({ trigger, supplier }: Props) {
+  const { firebaseUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -31,28 +34,38 @@ export function SupplierEditDialog({ trigger, supplier }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setName(supplier.name ?? "");
-    setPhone(supplier.phone ?? "");
-    setAddress(supplier.address ?? "");
-    setGstNumber(supplier.gstNumber ?? "");
-    setNotes(supplier.notes ?? "");
+    setName(supplier?.name ?? "");
+    setPhone(supplier?.phone ?? "");
+    setAddress(supplier?.address ?? "");
+    setGstNumber(supplier?.gstNumber ?? "");
+    setNotes(supplier?.notes ?? "");
   }, [open, supplier]);
 
   async function save() {
     if (!name.trim()) return;
     setBusy(true);
     try {
-      await updateSupplier(supplier.id, {
-        name: name.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-        gstNumber: gstNumber.trim(),
-        notes: notes.trim(),
-      });
-      toast.success("Supplier updated");
+      if (supplier) {
+        await updateSupplier(supplier.id, {
+          name: name.trim(),
+          phone: phone.trim(),
+          address: address.trim(),
+          gstNumber: gstNumber.trim(),
+          notes: notes.trim(),
+        });
+        toast.success("Supplier updated");
+      } else {
+        await createSupplier(name.trim(), firebaseUser!.uid, {
+          phone: phone.trim() || undefined,
+          address: address.trim() || undefined,
+          gstNumber: gstNumber.trim() || undefined,
+          notes: notes.trim() || undefined,
+        });
+        toast.success("Supplier added");
+      }
       setOpen(false);
     } catch {
-      toast.error("Could not update supplier");
+      toast.error(supplier ? "Could not update supplier" : "Could not add supplier");
     } finally {
       setBusy(false);
     }
@@ -63,7 +76,7 @@ export function SupplierEditDialog({ trigger, supplier }: Props) {
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit supplier</DialogTitle>
+          <DialogTitle>{supplier ? "Edit supplier" : "Add supplier"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">
@@ -90,7 +103,7 @@ export function SupplierEditDialog({ trigger, supplier }: Props) {
         <DialogFooter>
           <Button onClick={save} disabled={!name.trim() || busy}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save
+            {supplier ? "Save" : "Add"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -16,12 +16,18 @@ import type { Supplier } from "@/lib/types";
 
 export const suppliersQuery = () => query(collection(db, "suppliers"), orderBy("name"));
 
-/** Create a supplier on the fly (name only). Returns the new id. */
-export async function createSupplier(name: string, createdBy: string): Promise<string> {
+/** Create a supplier. Returns the new id. */
+export async function createSupplier(
+  name: string,
+  createdBy: string,
+  details?: Partial<Pick<Supplier, "phone" | "address" | "gstNumber" | "notes">>,
+): Promise<string> {
   const ref = await addDoc(collection(db, "suppliers"), {
     name: name.trim(),
+    active: true,
     createdBy,
     createdAt: serverTimestamp(),
+    ...(details ?? {}),
   });
   return ref.id;
 }
@@ -32,6 +38,11 @@ export async function updateSupplier(
   details: Partial<Pick<Supplier, "name" | "phone" | "address" | "gstNumber" | "notes">>,
 ): Promise<void> {
   await updateDoc(doc(db, "suppliers", id), details);
+}
+
+/** Admin: mark supplier active or inactive. */
+export async function setSupplierActive(id: string, active: boolean): Promise<void> {
+  await updateDoc(doc(db, "suppliers", id), { active });
 }
 
 /** Admin: delete a supplier. Callers should ensure it has no deliveries first. */

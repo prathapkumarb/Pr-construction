@@ -1,16 +1,18 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type { Delivery, DeliveryFinancial, Material, Supplier } from "@/lib/types";
+import type { Delivery, DeliveryFinancial, Material, Site, Supplier } from "@/lib/types";
 import { updateDelivery, deleteDelivery } from "@/services/deliveries";
 import { setDeliveryPrice, clearDeliveryPrice } from "@/services/financials";
 import { lineTotal } from "@/lib/ledger";
 import { formatInr } from "@/lib/format";
-import { createSupplier } from "@/services/suppliers";
+import { createSupplier, setSupplierActive } from "@/services/suppliers";
 import { createMaterial } from "@/services/materials";
+import { createSite, setSiteActive } from "@/services/sites";
 import { useAuth } from "@/lib/auth";
 import { SupplierPicker } from "@/components/pickers/SupplierPicker";
 import { MaterialPicker } from "@/components/pickers/MaterialPicker";
+import { SiteNamePicker } from "@/components/pickers/SiteNamePicker";
 import {
   Dialog,
   DialogContent,
@@ -30,9 +32,10 @@ interface Props {
   financial?: DeliveryFinancial;
   suppliers: Supplier[];
   materials: Material[];
+  sites?: Site[];
 }
 
-export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, materials }: Props) {
+export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, materials, sites = [] }: Props) {
   const { firebaseUser } = useAuth();
   const uid = firebaseUser!.uid;
   const [open, setOpen] = useState(false);
@@ -40,6 +43,7 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
   const [material, setMaterial] = useState<Material | null>(null);
   const [quantity, setQuantity] = useState("");
   const [date, setDate] = useState("");
+  const [siteName, setSiteName] = useState("");
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -49,6 +53,7 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
     setMaterial({ id: delivery.materialId, name: delivery.materialName, unit: delivery.unit });
     setQuantity(String(delivery.quantity));
     setDate(delivery.date);
+    setSiteName(delivery.siteName ?? "");
     setPrice(financial ? String(financial.price) : "");
   }, [open, delivery, financial]);
 
@@ -69,6 +74,7 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
         unit: material!.unit,
         quantity: qtyNum,
         date,
+        siteName: siteName.trim() || undefined,
       });
       if (price === "" || priceNum <= 0) {
         if (financial) await clearDeliveryPrice(delivery.id);
@@ -100,7 +106,11 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
               onSelect={setSupplier}
               onCreate={async (name) => {
                 const id = await createSupplier(name, uid);
-                setSupplier({ id, name });
+                setSupplier({ id, name, active: true });
+              }}
+              onReactivate={async (s) => {
+                await setSupplierActive(s.id, true);
+                setSupplier(s);
               }}
             />
           </div>
@@ -125,6 +135,16 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
               <Label htmlFor="edate">Date</Label>
               <Input id="edate" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-11" />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Site name — optional</Label>
+            <SiteNamePicker
+              sites={sites}
+              value={siteName}
+              onChange={setSiteName}
+              onCreate={async (name) => { await createSite(name, uid); setSiteName(name); }}
+              onReactivate={async (site) => { await setSiteActive(site.id, true); setSiteName(site.name); }}
+            />
           </div>
           <div className="space-y-2 rounded-md border bg-muted/30 p-3">
             <Label htmlFor="eprice">Price per {material?.unit ?? "unit"} (₹) — optional</Label>

@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown, Plus, Lightbulb } from "lucide-react";
 import type { Supplier } from "@/lib/types";
-import { findSimilar, hasExactMatch } from "@/lib/fuzzy";
+import { findSimilar, hasExactMatch, normalizeName } from "@/lib/fuzzy";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Command,
@@ -19,20 +20,33 @@ interface Props {
   value: Supplier | null;
   onSelect: (supplier: Supplier) => void;
   onCreate: (name: string) => Promise<void>;
+  /** Called when an inactive supplier is picked (admin reactivation flow). */
+  onReactivate?: (supplier: Supplier) => Promise<void>;
 }
 
-export function SupplierPicker({ suppliers, value, onSelect, onCreate }: Props) {
+export function SupplierPicker({ suppliers, value, onSelect, onCreate, onReactivate }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
 
+  const activeSuppliers = useMemo(() => suppliers.filter((s) => s.active !== false), [suppliers]);
+  const inactiveSuppliers = useMemo(() => suppliers.filter((s) => s.active === false), [suppliers]);
+
   const trimmed = search.trim();
+  const norm = normalizeName(trimmed);
+
   const suggestions = useMemo(
-    () => findSimilar(trimmed, suppliers, { threshold: 0.65 }),
-    [trimmed, suppliers],
+    () => findSimilar(trimmed, activeSuppliers, { threshold: 0.65 }),
+    [trimmed, activeSuppliers],
   );
   const exactExists = useMemo(() => hasExactMatch(trimmed, suppliers), [trimmed, suppliers]);
   const canCreate = trimmed.length >= 2 && !exactExists;
+
+  // When searching, show matching inactive suppliers too
+  const matchingInactive = useMemo(() => {
+    if (!norm) return [];
+    return inactiveSuppliers.filter((s) => normalizeName(s.name).includes(norm));
+  }, [norm, inactiveSuppliers]);
 
   async function handleCreate() {
     setCreating(true);
@@ -43,6 +57,13 @@ export function SupplierPicker({ suppliers, value, onSelect, onCreate }: Props) 
     } finally {
       setCreating(false);
     }
+  }
+
+  async function handleReactivate(s: Supplier) {
+    if (onReactivate) await onReactivate(s);
+    else onSelect(s);
+    setOpen(false);
+    setSearch("");
   }
 
   return (
@@ -60,7 +81,7 @@ export function SupplierPicker({ suppliers, value, onSelect, onCreate }: Props) 
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command shouldFilter>
+        <Command shouldFilter={false}>
           <CommandInput placeholder="Search or type a name…" value={search} onValueChange={setSearch} />
 
           {canCreate && suggestions.length > 0 && (
@@ -88,28 +109,47 @@ export function SupplierPicker({ suppliers, value, onSelect, onCreate }: Props) 
           )}
 
           <CommandList>
-            <CommandEmpty>No supplier found.</CommandEmpty>
+            <CommandEmpty>{trimmed ? "No active supplier found." : "No suppliers yet."}</CommandEmpty>
             <CommandGroup>
-              {suppliers.map((s) => (
-                <CommandItem
-                  key={s.id}
-                  value={s.name}
-                  onSelect={() => {
-                    onSelect(s);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value?.id === s.id ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  {s.name}
-                </CommandItem>
-              ))}
+              {activeSuppliers
+                .filter((s) => !norm || normalizeName(s.name).includes(norm))
+                .map((s) => (
+                  <CommandItem
+                    key={s.id}
+                    value={s.name}
+                    onSelect={() => {
+                      onSelect(s);
+                      setOpen(false);
+                      setSearch("");
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value?.id === s.id ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    {s.name}
+                  </CommandItem>
+                ))}
             </CommandGroup>
+
+            {matchingInactive.length > 0 && onReactivate && (
+              <CommandGroup heading="Inactive — tap to reactivate">
+                {matchingInactive.map((s) => (
+                  <CommandItem
+                    key={s.id}
+                    value={`inactive-${s.id}`}
+                    onSelect={() => handleReactivate(s)}
+                    className="opacity-60"
+                  >
+                    <Check className="mr-2 h-4 w-4 opacity-0" />
+                    {s.name}
+                    <Badge variant="outline" className="ml-auto text-[10px]">inactive</Badge>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
           </CommandList>
 
           {canCreate && (
@@ -122,7 +162,7 @@ export function SupplierPicker({ suppliers, value, onSelect, onCreate }: Props) 
                 onClick={handleCreate}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Add new supplier “{trimmed}”
+                Add new supplier "{trimmed}"
               </Button>
             </div>
           )}
