@@ -1,10 +1,27 @@
 import type { ReportData } from "@/lib/reports";
 
+export interface DeliveryLogExportRow {
+  Date: string;
+  Supplier: string;
+  Site: string;
+  Material: string;
+  Unit: string;
+  Qty: number;
+  "Rate (₹)": number | string;
+  "Value (₹)": number | string;
+  "Paid (₹)": number;
+  "Balance (₹)": number;
+  "Added by": string;
+}
+
 /**
  * Export a report as a multi-sheet Excel workbook. xlsx is imported
  * dynamically so it stays out of the main bundle until first used.
  */
-export async function exportReportToExcel(report: ReportData): Promise<void> {
+export async function exportReportToExcel(
+  report: ReportData,
+  deliveryLog?: DeliveryLogExportRow[],
+): Promise<void> {
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
 
@@ -59,6 +76,11 @@ export async function exportReportToExcel(report: ReportData): Promise<void> {
     })),
   );
   XLSX.utils.book_append_sheet(wb, payments, "Payments");
+
+  if (deliveryLog && deliveryLog.length > 0) {
+    const dlSheet = XLSX.utils.json_to_sheet(deliveryLog);
+    XLSX.utils.book_append_sheet(wb, dlSheet, "Delivery log");
+  }
 
   const fname = `flux-report_${report.range.start}_to_${report.range.end}.xlsx`;
   XLSX.writeFile(wb, fname);

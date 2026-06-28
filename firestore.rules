@@ -6,24 +6,35 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
-    function roleOf() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
+    // isSignedIn() always short-circuits first, so request.auth.uid is never
+    // accessed when unauthenticated and get() is only called for valid sessions.
     function isAdmin() {
-      return isSignedIn() && roleOf() == 'admin';
+      return isSignedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('disabled', false) != true
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     function isStaff() {
-      return isSignedIn() && (roleOf() == 'admin' || roleOf() == 'supervisor');
+      return isSignedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('disabled', false) != true
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'supervisor');
     }
 
     // User profiles. Users may read their own doc and create it (as pending)
-    // on first login. Only admins can read everyone or change roles.
+    // on first login. Admins can create docs for other users (e.g. admin-provisioned accounts)
+    // and can read everyone, change roles, or delete.
     match /users/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow create: if isSignedIn()
-                    && request.auth.uid == uid
-                    && request.resource.data.role == 'pending';
+      allow create: if isAdmin()
+                    || (isSignedIn()
+                        && request.auth.uid == uid
+                        && request.resource.data.role == 'pending');
       allow update, delete: if isAdmin();
+    }
+
+    // Admin-created user credentials (passwords). Admin-only.
+    match /userCredentials/{uid} {
+      allow read, write: if isAdmin();
     }
 
     // Suppliers & materials: staff can read and create on the fly.

@@ -3,10 +3,14 @@ import type { Timestamp } from "firebase/firestore";
 export type Role = "admin" | "supervisor" | "pending";
 
 export interface UserDoc {
-  uid: string;
+  /** Injected by useCollectionData (doc ID = Firebase UID). Not set via useAuth directly. */
+  id?: string;
+  /** Stored in Firestore doc data. May be absent for legacy docs; always set going forward. */
+  uid?: string;
   email: string;
   name: string;
   role: Role;
+  disabled?: boolean;
   createdAt?: Timestamp;
 }
 

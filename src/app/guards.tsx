@@ -11,11 +11,12 @@ function FullScreenLoader() {
   );
 }
 
-/** Requires a signed-in user. Redirects to /login otherwise. */
+/** Requires a signed-in, non-disabled user. Redirects to /login or /blocked. */
 export function RequireAuth() {
-  const { firebaseUser, loading } = useAuth();
+  const { firebaseUser, userDoc, loading } = useAuth();
   if (loading) return <FullScreenLoader />;
   if (!firebaseUser) return <Navigate to="/login" replace />;
+  if (userDoc?.disabled) return <Navigate to="/blocked" replace />;
   return <Outlet />;
 }
 

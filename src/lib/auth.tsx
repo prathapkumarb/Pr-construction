@@ -27,12 +27,16 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-/** Ensure a users/{uid} doc exists; create as "pending" on first login. */
+/** Ensure a users/{uid} doc exists; create as "pending" on first login.
+ *  Does NOT backfill uid into existing docs — only admins can update user docs,
+ *  so a backfill would fail with permission-denied for supervisors/pending users.
+ *  Use u.id (the injected Firestore doc ID) as the reliable UID everywhere. */
 async function ensureUserDoc(user: FirebaseUser): Promise<void> {
   const ref = doc(db, "users", user.uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
     await setDoc(ref, {
+      uid: user.uid,
       email: user.email ?? "",
       name: user.displayName ?? user.email?.split("@")[0] ?? "User",
       role: "pending" as Role,

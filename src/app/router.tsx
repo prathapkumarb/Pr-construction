@@ -3,6 +3,7 @@ import { RequireAuth, RequireRole, RoleHome } from "@/app/guards";
 import { AppLayout } from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
 import PendingPage from "@/pages/PendingPage";
+import BlockedPage from "@/pages/BlockedPage";
 import DeliveriesPage from "@/pages/DeliveriesPage";
 import AddDeliveryPage from "@/pages/AddDeliveryPage";
 import DashboardPage from "@/pages/admin/DashboardPage";
@@ -15,6 +16,7 @@ import MaterialsPage from "@/pages/admin/MaterialsPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/blocked", element: <BlockedPage /> },
   {
     element: <RequireAuth />,
     children: [
