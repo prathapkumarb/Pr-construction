@@ -73,7 +73,7 @@ export default function SuppliersPage() {
             <Card
               key={s.supplierId}
               className="cursor-pointer transition-colors hover:bg-accent"
-              onClick={() => navigate(`/suppliers/${s.supplierId}`)}
+              onClick={() => navigate(`/records/suppliers/${s.supplierId}`)}
             >
               <CardContent className="flex items-center justify-between gap-3 p-4">
                 <div className="min-w-0 flex-1">
@@ -128,7 +128,7 @@ export default function SuppliersPage() {
                   <Card
                     key={s.supplierId}
                     className="cursor-pointer opacity-60 transition-colors hover:bg-accent"
-                    onClick={() => navigate(`/suppliers/${s.supplierId}`)}
+                    onClick={() => navigate(`/records/suppliers/${s.supplierId}`)}
                   >
                     <CardContent className="flex items-center justify-between gap-3 p-4">
                       <div className="min-w-0 flex-1">

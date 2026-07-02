@@ -14,8 +14,9 @@ export function formatInr(amount: number): string {
   return inrCurrency.format(amount);
 }
 
-/** Format a plain number with Indian grouping, e.g. quantities. */
-export function formatNumber(value: number): string {
+/** Format a plain number with Indian grouping, e.g. quantities. Passes strings through as-is. */
+export function formatNumber(value: number | string): string {
+  if (typeof value === "string") return value;
   if (!Number.isFinite(value)) return "0";
   return inrNumber.format(value);
 }

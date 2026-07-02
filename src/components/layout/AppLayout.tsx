@@ -1,40 +1,52 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  Truck,
-  Users,
-  Wallet,
+  Building2,
   BarChart3,
+  HardHat,
+  Ellipsis,
   UserCog,
-  Boxes,
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { AccessProvider, useAccess } from "@/lib/accessContext";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 interface NavItem {
   to: string;
   label: string;
-  icon: typeof Truck;
+  icon: typeof Building2;
+  activePrefix?: string;
 }
-
-const supervisorNav: NavItem[] = [
-  { to: "/deliveries", label: "Deliveries", icon: Truck },
-];
 
 const adminNav: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { to: "/deliveries", label: "Deliveries", icon: Truck },
-  { to: "/suppliers", label: "Suppliers", icon: Users },
-  { to: "/materials", label: "Materials", icon: Boxes },
-  { to: "/payments", label: "Payments", icon: Wallet },
+  { to: "/records/deliveries", label: "Suppliers", icon: Building2, activePrefix: "/records" },
   { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/labour", label: "Labour", icon: HardHat },
+  { to: "/more", label: "More", icon: Ellipsis },
 ];
 
-export function AppLayout() {
+function AppContent() {
   const { role, userDoc, signOut } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const access = useAccess();
+
+  // Supervisor nav respects per-role access config from Firestore
+  const supervisorNav: NavItem[] = [
+    ...(access.tabs.suppliers
+      ? [{ to: "/records/deliveries", label: "Suppliers", icon: Building2, activePrefix: "/records" } as NavItem]
+      : []),
+    ...(access.tabs.labour
+      ? [{ to: "/labour", label: "Labour", icon: HardHat } as NavItem]
+      : []),
+    ...(access.tabs.more
+      ? [{ to: "/more", label: "More", icon: Ellipsis } as NavItem]
+      : []),
+  ];
+
   const items = role === "admin" ? adminNav : supervisorNav;
 
   return (
@@ -74,23 +86,35 @@ export function AppLayout() {
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-background pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex max-w-3xl items-stretch justify-around">
-          {items.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
+          {items.map(({ to, label, icon: Icon, activePrefix }) => {
+            const active = activePrefix
+              ? pathname.startsWith(activePrefix)
+              : pathname === to;
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={!activePrefix}
+                className={cn(
                   "flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground",
-                )
-              }
-            >
-              <Icon className="h-5 w-5" />
-              {label}
-            </NavLink>
-          ))}
+                  active ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                {label}
+              </NavLink>
+            );
+          })}
         </div>
       </nav>
     </div>
+  );
+}
+
+export function AppLayout() {
+  return (
+    <AccessProvider>
+      <AppContent />
+    </AccessProvider>
   );
 }

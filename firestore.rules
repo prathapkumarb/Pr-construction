@@ -13,11 +13,11 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('disabled', false) != true
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
+    // Any active user with a non-pending role (admin, supervisor, or any custom role like hr, site_manager)
     function isStaff() {
       return isSignedIn()
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('disabled', false) != true
-        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'supervisor');
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'pending';
     }
 
     // User profiles. Users may read their own doc and create it (as pending)
@@ -62,12 +62,51 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // MONEY — admin only at the data layer. Supervisors cannot read these.
+    // Labour module: workers, attendance, payments.
+    // Staff can create (supervisors mark attendance, record advances).
+    // Only admins can edit/delete historical records.
+    match /labourWorkers/{id} {
+      allow read, create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+    match /labourAttendance/{id} {
+      allow read, create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+    match /labourPayments/{id} {
+      allow read, create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+    match /labourRates/{id} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update, delete: if isAdmin();
+    }
+
+    // App-level settings (e.g. access control config). Any signed-in user may read
+    // so their role's access config loads on login. Only admins may write.
+    match /settings/{doc} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // MONEY — admin always has full access. Other active roles can read if the
+    // access config grants them the relevant permission.
     match /deliveryFinancials/{id} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin()
+        || (isStaff()
+            && get(/databases/$(database)/documents/settings/accessControl)
+                .data.get(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role, {})
+                .get('fields', {}).get('deliveryPricing', false) == true);
+      allow write: if isAdmin();
     }
     match /payments/{id} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin()
+        || (isStaff()
+            && get(/databases/$(database)/documents/settings/accessControl)
+                .data.get(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role, {})
+                .get('tabs', {}).get('subPayments', false) == true);
+      allow write: if isAdmin();
     }
   }
 }

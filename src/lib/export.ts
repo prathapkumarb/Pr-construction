@@ -6,7 +6,7 @@ export interface DeliveryLogExportRow {
   Site: string;
   Material: string;
   Unit: string;
-  Qty: number;
+  Qty: number | string;
   "Rate (₹)": number | string;
   "Value (₹)": number | string;
   "Paid (₹)": number;

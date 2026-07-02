@@ -54,6 +54,7 @@ export function PaymentDialog({
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -61,6 +62,7 @@ export function PaymentDialog({
     setAmount(payment ? String(payment.amount) : "");
     setDate(payment?.date ?? format(new Date(), "yyyy-MM-dd"));
     setNote(payment?.note ?? "");
+    setAttempted(false);
   }, [open, payment, defaultSupplierId]);
 
   const totalsMap = useMemo(
@@ -73,6 +75,7 @@ export function PaymentDialog({
   const valid = supplierId && amount !== "" && amountNum > 0 && date;
 
   async function save() {
+    setAttempted(true);
     if (!valid) return;
     setBusy(true);
     try {
@@ -126,6 +129,9 @@ export function PaymentDialog({
                 ))}
               </SelectContent>
             </Select>
+            {attempted && !supplierId && (
+              <p className="text-xs text-destructive">Supplier is required</p>
+            )}
           </div>
 
           {selectedTotals && (
@@ -161,6 +167,9 @@ export function PaymentDialog({
                 onChange={(e) => setAmount(e.target.value)}
                 className="h-11"
               />
+              {attempted && (amount === "" || amountNum <= 0) && (
+                <p className="text-xs text-destructive">Amount must be greater than 0</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="pdate">Date</Label>
@@ -171,6 +180,9 @@ export function PaymentDialog({
                 onChange={(e) => setDate(e.target.value)}
                 className="h-11"
               />
+              {attempted && !date && (
+                <p className="text-xs text-destructive">Date is required</p>
+              )}
             </div>
           </div>
           <div className="space-y-2">
@@ -186,7 +198,7 @@ export function PaymentDialog({
           ) : (
             <span />
           )}
-          <Button onClick={save} disabled={!valid || busy}>
+          <Button onClick={save} disabled={busy}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {payment ? "Save" : "Record"}
           </Button>

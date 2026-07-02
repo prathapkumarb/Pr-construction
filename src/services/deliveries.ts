@@ -21,7 +21,7 @@ export interface NewDelivery {
   materialId: string;
   materialName: string;
   unit: string;
-  quantity: number;
+  quantity: number | string;
   date: string; // yyyy-MM-dd
   siteName?: string;
 }
@@ -45,7 +45,7 @@ export async function updateDelivery(id: string, input: NewDelivery): Promise<vo
 
   const finRef = doc(db, "deliveryFinancials", id);
   const finSnap = await getDoc(finRef);
-  if (finSnap.exists()) {
+  if (finSnap.exists() && typeof input.quantity === "number") {
     const price = finSnap.data().price as number;
     await updateDoc(finRef, { lineTotal: lineTotal(input.quantity, price) });
   }

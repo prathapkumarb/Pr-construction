@@ -1,6 +1,7 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type Role = "admin" | "supervisor" | "pending";
+/** Built-in roles: "admin" | "supervisor" | "pending". Custom roles (e.g. "hr", "site_manager") are also valid. */
+export type Role = string;
 
 export interface UserDoc {
   /** Injected by useCollectionData (doc ID = Firebase UID). Not set via useAuth directly. */
@@ -50,7 +51,7 @@ export interface Delivery {
   materialId: string;
   materialName: string;
   unit: string;
-  quantity: number;
+  quantity: number | string;
   /** ISO date string (yyyy-MM-dd) for the delivery day */
   date: string;
   siteName?: string;

@@ -3,7 +3,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Delivery, DeliveryFinancial, Material, Site, Supplier } from "@/lib/types";
 import { updateDelivery, deleteDelivery } from "@/services/deliveries";
-import { setDeliveryPrice, clearDeliveryPrice } from "@/services/financials";
+import { setDeliveryPrice, setDeliveryTotal, clearDeliveryPrice } from "@/services/financials";
 import { lineTotal } from "@/lib/ledger";
 import { formatInr } from "@/lib/format";
 import { createSupplier, setSupplierActive } from "@/services/suppliers";
@@ -45,7 +45,9 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
   const [date, setDate] = useState("");
   const [siteName, setSiteName] = useState("");
   const [price, setPrice] = useState("");
+  const [totalAmount, setTotalAmount] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -54,15 +56,21 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
     setQuantity(String(delivery.quantity));
     setDate(delivery.date);
     setSiteName(delivery.siteName ?? "");
-    setPrice(financial ? String(financial.price) : "");
+    const isBulk = typeof delivery.quantity === "string";
+    setPrice(!isBulk && financial ? String(financial.price) : "");
+    setTotalAmount(isBulk && financial ? String(financial.lineTotal) : "");
+    setAttempted(false);
   }, [open, delivery, financial]);
 
   const qtyNum = Number(quantity);
+  const isNumericQty = quantity.trim() !== "" && !isNaN(qtyNum) && qtyNum > 0;
   const priceNum = Number(price);
-  const valid = supplier && material && qtyNum > 0 && date;
-  const previewTotal = priceNum > 0 && qtyNum > 0 ? lineTotal(qtyNum, priceNum) : null;
+  const totalAmountNum = Number(totalAmount);
+  const valid = supplier && material && quantity.trim() !== "" && date;
+  const previewTotal = priceNum > 0 && isNumericQty ? lineTotal(qtyNum, priceNum) : null;
 
   async function save() {
+    setAttempted(true);
     if (!valid) return;
     setBusy(true);
     try {
@@ -72,14 +80,22 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
         materialId: material!.id,
         materialName: material!.name,
         unit: material!.unit,
-        quantity: qtyNum,
+        quantity: isNumericQty ? qtyNum : quantity.trim(),
         date,
         siteName: siteName.trim() || undefined,
       });
-      if (price === "" || priceNum <= 0) {
-        if (financial) await clearDeliveryPrice(delivery.id);
+      if (isNumericQty) {
+        if (priceNum > 0) {
+          await setDeliveryPrice(delivery.id, priceNum, qtyNum);
+        } else if (financial) {
+          await clearDeliveryPrice(delivery.id);
+        }
       } else {
-        await setDeliveryPrice(delivery.id, priceNum, qtyNum);
+        if (totalAmountNum > 0) {
+          await setDeliveryTotal(delivery.id, totalAmountNum);
+        } else if (financial) {
+          await clearDeliveryPrice(delivery.id);
+        }
       }
       toast.success("Delivery updated");
       setOpen(false);
@@ -113,6 +129,9 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
                 setSupplier(s);
               }}
             />
+            {attempted && !supplier && (
+              <p className="text-xs text-destructive">Supplier is required</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Material</Label>
@@ -125,15 +144,24 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
                 setMaterial({ id, name, unit });
               }}
             />
+            {attempted && !material && (
+              <p className="text-xs text-destructive">Material is required</p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="eqty">Quantity{material ? ` (${material.unit})` : ""}</Label>
-              <Input id="eqty" type="number" inputMode="decimal" min="0" step="any" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="h-11" />
+              <Input id="eqty" type="text" inputMode="decimal" placeholder="e.g. 50 or 2 truck loads" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="h-11" />
+              {attempted && quantity.trim() === "" && (
+                <p className="text-xs text-destructive">Quantity is required</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edate">Date</Label>
               <Input id="edate" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-11" />
+              {attempted && !date && (
+                <p className="text-xs text-destructive">Date is required</p>
+              )}
             </div>
           </div>
           <div className="space-y-2">
@@ -147,12 +175,21 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
             />
           </div>
           <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-            <Label htmlFor="eprice">Price per {material?.unit ?? "unit"} (₹) — optional</Label>
-            <Input id="eprice" type="number" inputMode="decimal" min="0" step="any" placeholder="Not priced yet" value={price} onChange={(e) => setPrice(e.target.value)} className="h-11" />
-            {previewTotal !== null && (
-              <p className="text-sm text-muted-foreground">
-                Line total: <span className="font-semibold text-foreground">{formatInr(previewTotal)}</span>
-              </p>
+            {isNumericQty ? (
+              <>
+                <Label htmlFor="eprice">Price per {material?.unit ?? "unit"} (₹) — optional</Label>
+                <Input id="eprice" type="number" inputMode="decimal" min="0" step="any" placeholder="Not priced yet" value={price} onChange={(e) => setPrice(e.target.value)} className="h-11" />
+                {previewTotal !== null && (
+                  <p className="text-sm text-muted-foreground">
+                    Total: <span className="font-semibold text-foreground">{formatInr(previewTotal)}</span>
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <Label htmlFor="etotal">Total amount (₹) — optional</Label>
+                <Input id="etotal" type="number" inputMode="decimal" min="0" step="any" placeholder="Not priced yet" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} className="h-11" />
+              </>
             )}
           </div>
         </div>
@@ -173,7 +210,7 @@ export function DeliveryAdminDialog({ trigger, delivery, financial, suppliers, m
               setOpen(false);
             }}
           />
-          <Button onClick={save} disabled={!valid || busy}>
+          <Button onClick={save} disabled={busy}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save
           </Button>

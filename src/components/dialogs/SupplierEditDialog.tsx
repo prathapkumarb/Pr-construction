@@ -31,6 +31,7 @@ export function SupplierEditDialog({ trigger, supplier }: Props) {
   const [gstNumber, setGstNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -39,9 +40,11 @@ export function SupplierEditDialog({ trigger, supplier }: Props) {
     setAddress(supplier?.address ?? "");
     setGstNumber(supplier?.gstNumber ?? "");
     setNotes(supplier?.notes ?? "");
+    setAttempted(false);
   }, [open, supplier]);
 
   async function save() {
+    setAttempted(true);
     if (!name.trim()) return;
     setBusy(true);
     try {
@@ -82,6 +85,9 @@ export function SupplierEditDialog({ trigger, supplier }: Props) {
           <div className="space-y-2">
             <Label htmlFor="sname">Name</Label>
             <Input id="sname" value={name} onChange={(e) => setName(e.target.value)} className="h-11" />
+            {attempted && !name.trim() && (
+              <p className="text-xs text-destructive">Name is required</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="sphone">Phone</Label>
@@ -101,7 +107,7 @@ export function SupplierEditDialog({ trigger, supplier }: Props) {
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={save} disabled={!name.trim() || busy}>
+          <Button onClick={save} disabled={busy}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {supplier ? "Save" : "Add"}
           </Button>

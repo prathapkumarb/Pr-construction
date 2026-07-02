@@ -34,16 +34,19 @@ export function MaterialDialog({ trigger, material, usageCount = 0 }: Props) {
   const [name, setName] = useState("");
   const [unit, setUnit] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setName(material?.name ?? "");
     setUnit(material?.unit ?? "");
+    setAttempted(false);
   }, [open, material]);
 
   const valid = name.trim() && unit.trim();
 
   async function save() {
+    setAttempted(true);
     if (!valid) return;
     setBusy(true);
     try {
@@ -79,6 +82,9 @@ export function MaterialDialog({ trigger, material, usageCount = 0 }: Props) {
           <div className="space-y-2">
             <Label htmlFor="mname">Name</Label>
             <Input id="mname" value={name} onChange={(e) => setName(e.target.value)} className="h-11" />
+            {attempted && !name.trim() && (
+              <p className="text-xs text-destructive">Name is required</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="munit">Unit</Label>
@@ -98,10 +104,13 @@ export function MaterialDialog({ trigger, material, usageCount = 0 }: Props) {
               ))}
             </div>
             <Input id="munit" value={unit} onChange={(e) => setUnit(e.target.value)} className="h-11" />
+            {attempted && !unit.trim() && (
+              <p className="text-xs text-destructive">Unit is required</p>
+            )}
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={save} disabled={!valid || busy}>
+          <Button onClick={save} disabled={busy}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {material ? "Save" : "Add"}
           </Button>

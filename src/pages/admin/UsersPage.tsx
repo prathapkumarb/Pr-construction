@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useCollectionData } from "@/hooks/useCollectionData";
 import type { Role, UserDoc } from "@/lib/types";
 import { usersQuery, setUserRole, disableUser, enableUser, resetUserPassword } from "@/services/users";
+import { useFullAccessConfig } from "@/lib/accessContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,11 +29,11 @@ import {
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CreateUserDialog } from "@/components/dialogs/CreateUserDialog";
 
-const roleVariant: Record<Role, "default" | "secondary" | "outline"> = {
-  admin: "default",
-  supervisor: "secondary",
-  pending: "outline",
-};
+function roleBadgeVariant(role: Role): "default" | "secondary" | "outline" {
+  if (role === "admin") return "default";
+  if (role === "pending") return "outline";
+  return "secondary";
+}
 
 interface ResetPasswordDialogProps {
   uid: string;
@@ -112,9 +113,23 @@ export default function UsersPage() {
   const q = useMemo(() => usersQuery(), []);
   const { data: users, loading } = useCollectionData<UserDoc>(q);
   const [roleBusy, setRoleBusy] = useState<string | null>(null);
+  const fullConfig = useFullAccessConfig();
 
   const activeUsers = useMemo(() => users.filter((u) => !u.disabled), [users]);
   const disabledUsers = useMemo(() => users.filter((u) => u.disabled), [users]);
+
+  // Custom roles = union of roles in access config + roles currently assigned to users
+  // This ensures a role is always selectable even if Firestore config hasn't loaded yet,
+  // and users with an existing custom role can always see their role in the dropdown.
+  const BUILTIN_ROLES = new Set(["admin", "supervisor", "pending"]);
+  const customRoles = useMemo(() => {
+    const fromConfig = Object.keys(fullConfig);
+    const fromUsers = users.map((u) => u.role);
+    const all = new Set([...fromConfig, ...fromUsers]);
+    return [...all]
+      .filter((r) => !BUILTIN_ROLES.has(r))
+      .sort();
+  }, [fullConfig, users]);
 
   async function changeRole(uid: string, role: Role) {
     setRoleBusy(uid);
@@ -169,20 +184,25 @@ export default function UsersPage() {
                     <p className="truncate text-sm text-muted-foreground">{u.email}</p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Badge variant={roleVariant[u.role]} className="capitalize hidden sm:flex">
-                      {u.role}
+                    <Badge variant={roleBadgeVariant(u.role)} className="capitalize hidden sm:flex">
+                      {u.role.replace(/_/g, " ")}
                     </Badge>
                     <Select
                       value={u.role}
                       disabled={isSelf || roleBusy === uid}
                       onValueChange={(v) => changeRole(uid, v as Role)}
                     >
-                      <SelectTrigger className="h-9 w-[120px]">
+                      <SelectTrigger className="h-9 w-[130px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="supervisor">Supervisor</SelectItem>
+                        {customRoles.map((r) => (
+                          <SelectItem key={r} value={r} className="capitalize">
+                            {r.replace(/_/g, " ")}
+                          </SelectItem>
+                        ))}
                         <SelectItem value="pending">Pending</SelectItem>
                       </SelectContent>
                     </Select>

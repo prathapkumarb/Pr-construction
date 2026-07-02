@@ -10,9 +10,10 @@ import { suppliersQuery, createSupplier, setSupplierActive } from "@/services/su
 import { materialsQuery, createMaterial } from "@/services/materials";
 import { createDelivery } from "@/services/deliveries";
 import { sitesQuery, createSite, setSiteActive } from "@/services/sites";
-import { setDeliveryPrice } from "@/services/financials";
+import { setDeliveryPrice, setDeliveryTotal } from "@/services/financials";
 import { lineTotal } from "@/lib/ledger";
 import { formatInr } from "@/lib/format";
+import { useAccess } from "@/lib/accessContext";
 import { SupplierPicker } from "@/components/pickers/SupplierPicker";
 import { MaterialPicker } from "@/components/pickers/MaterialPicker";
 import { SiteNamePicker } from "@/components/pickers/SiteNamePicker";
@@ -22,10 +23,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AddDeliveryPage() {
-  const { firebaseUser, role } = useAuth();
+  const { firebaseUser } = useAuth();
   const navigate = useNavigate();
   const uid = firebaseUser!.uid;
-  const isAdmin = role === "admin";
 
   const sQuery = useMemo(() => suppliersQuery(), []);
   const mQuery = useMemo(() => materialsQuery(), []);
@@ -40,12 +40,17 @@ export default function AddDeliveryPage() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [siteName, setSiteName] = useState("");
   const [price, setPrice] = useState("");
+  const [totalAmount, setTotalAmount] = useState("");
   const [saving, setSaving] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const access = useAccess();
 
   const qtyNum = Number(quantity);
+  const isNumericQty = quantity.trim() !== "" && !isNaN(qtyNum) && qtyNum > 0;
   const priceNum = Number(price);
-  const valid = supplier && material && quantity !== "" && qtyNum > 0 && date;
-  const previewTotal = isAdmin && priceNum > 0 && qtyNum > 0 ? lineTotal(qtyNum, priceNum) : null;
+  const totalAmountNum = Number(totalAmount);
+  const valid = supplier && material && quantity.trim() !== "" && date;
+  const previewTotal = isNumericQty && priceNum > 0 ? lineTotal(qtyNum, priceNum) : null;
 
   async function handleCreateSupplier(name: string) {
     const id = await createSupplier(name, uid);
@@ -78,6 +83,7 @@ export default function AddDeliveryPage() {
   }
 
   async function handleSubmit() {
+    setAttempted(true);
     if (!valid) return;
     setSaving(true);
     try {
@@ -88,14 +94,16 @@ export default function AddDeliveryPage() {
           materialId: material!.id,
           materialName: material!.name,
           unit: material!.unit,
-          quantity: qtyNum,
+          quantity: isNumericQty ? qtyNum : quantity.trim(),
           date,
           siteName: siteName.trim() || undefined,
         },
         uid,
       );
-      if (isAdmin && priceNum > 0) {
+      if (isNumericQty && priceNum > 0) {
         await setDeliveryPrice(deliveryId, priceNum, qtyNum);
+      } else if (!isNumericQty && totalAmountNum > 0) {
+        await setDeliveryTotal(deliveryId, totalAmountNum);
       }
       toast.success("Delivery recorded");
       navigate("/deliveries");
@@ -127,6 +135,9 @@ export default function AddDeliveryPage() {
               onCreate={handleCreateSupplier}
               onReactivate={handleReactivateSupplier}
             />
+            {attempted && !supplier && (
+              <p className="text-xs text-destructive">Supplier is required</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -137,6 +148,9 @@ export default function AddDeliveryPage() {
               onSelect={setMaterial}
               onCreate={handleCreateMaterial}
             />
+            {attempted && !material && (
+              <p className="text-xs text-destructive">Material is required</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -144,15 +158,16 @@ export default function AddDeliveryPage() {
               <Label htmlFor="qty">Quantity{material ? ` (${material.unit})` : ""}</Label>
               <Input
                 id="qty"
-                type="number"
+                type="text"
                 inputMode="decimal"
-                min="0"
-                step="any"
-                placeholder="0"
+                placeholder="e.g. 50 or 2 truck loads"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 className="h-11"
               />
+              {attempted && quantity.trim() === "" && (
+                <p className="text-xs text-destructive">Quantity is required</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
@@ -163,6 +178,9 @@ export default function AddDeliveryPage() {
                 onChange={(e) => setDate(e.target.value)}
                 className="h-11"
               />
+              {attempted && !date && (
+                <p className="text-xs text-destructive">Date is required</p>
+              )}
             </div>
           </div>
 
@@ -177,34 +195,55 @@ export default function AddDeliveryPage() {
             />
           </div>
 
-          {isAdmin && (
-            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-              <Label htmlFor="price">
-                Price per {material?.unit ?? "unit"} (₹) — optional
-              </Label>
-              <Input
-                id="price"
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="any"
-                placeholder="Leave blank to price later"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="h-11"
-              />
-              {previewTotal !== null && (
-                <p className="text-sm text-muted-foreground">
-                  Line total:{" "}
-                  <span className="font-semibold text-foreground">{formatInr(previewTotal)}</span>
-                </p>
-              )}
-            </div>
+          {access.fields.deliveryPricing && (
+          <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+            {isNumericQty ? (
+              <>
+                <Label htmlFor="price">
+                  Price per {material?.unit ?? "unit"} (₹) — optional
+                </Label>
+                <Input
+                  id="price"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="any"
+                  placeholder="Leave blank to price later"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="h-11"
+                />
+                {previewTotal !== null && (
+                  <p className="text-sm text-muted-foreground">
+                    Total:{" "}
+                    <span className="font-semibold text-foreground">{formatInr(previewTotal)}</span>
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <Label htmlFor="totalAmount">
+                  Total amount (₹) — optional
+                </Label>
+                <Input
+                  id="totalAmount"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="any"
+                  placeholder="Leave blank to price later"
+                  value={totalAmount}
+                  onChange={(e) => setTotalAmount(e.target.value)}
+                  className="h-11"
+                />
+              </>
+            )}
+          </div>
           )}
         </CardContent>
       </Card>
 
-      <Button className="h-12 w-full text-base" disabled={!valid || saving} onClick={handleSubmit}>
+      <Button className="h-12 w-full text-base" disabled={saving} onClick={handleSubmit}>
         {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Save delivery
       </Button>

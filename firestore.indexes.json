@@ -7,6 +7,14 @@
         { "fieldPath": "date", "order": "DESCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "labourRates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "workerId", "order": "ASCENDING" },
+        { "fieldPath": "effectiveFrom", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

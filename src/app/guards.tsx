@@ -1,6 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import type { Role } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 
 function FullScreenLoader() {
@@ -20,11 +19,16 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-/** Requires the user's role to be in the allowed list. */
-export function RequireRole({ allow }: { allow: Role[] }) {
+/**
+ * Requires the user's role to be in the allowed list.
+ * Pass "admin" for admin-only routes.
+ * Pass "*" to allow any non-pending, active role (admin, supervisor, custom roles like hr/site_manager).
+ */
+export function RequireRole({ allow }: { allow: string[] }) {
   const { role, loading } = useAuth();
   if (loading) return <FullScreenLoader />;
   if (role === "pending" || role === null) return <Navigate to="/pending" replace />;
+  if (allow.includes("*")) return <Outlet />;
   if (!allow.includes(role)) return <Navigate to="/" replace />;
   return <Outlet />;
 }
@@ -34,6 +38,7 @@ export function RoleHome() {
   const { role, loading } = useAuth();
   if (loading) return <FullScreenLoader />;
   if (role === "admin") return <Navigate to="/dashboard" replace />;
-  if (role === "supervisor") return <Navigate to="/deliveries" replace />;
-  return <Navigate to="/pending" replace />;
+  if (role === "pending" || role === null) return <Navigate to="/pending" replace />;
+  // Any other role (supervisor, hr, site_manager, etc.)
+  return <Navigate to="/records/deliveries" replace />;
 }

@@ -70,7 +70,7 @@ export default function SupplierDetailPage() {
   if (!supplier || !totals) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/suppliers")}>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/records/suppliers")}>
           <ArrowLeft className="mr-1 h-4 w-4" /> Suppliers
         </Button>
         <p className="py-8 text-center text-sm text-muted-foreground">Supplier not found.</p>
@@ -83,7 +83,7 @@ export default function SupplierDetailPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/suppliers")}>
+        <Button variant="ghost" size="sm" onClick={() => navigate("/records/suppliers")}>
           <ArrowLeft className="mr-1 h-4 w-4" /> Suppliers
         </Button>
         <div className="flex items-center gap-1">
@@ -99,7 +99,7 @@ export default function SupplierDetailPage() {
             <MergeSupplierDialog
               source={supplier}
               others={others}
-              onMerged={(targetId) => navigate(`/suppliers/${targetId}`)}
+              onMerged={(targetId) => navigate(`/records/suppliers/${targetId}`)}
               trigger={
                 <Button variant="ghost" size="icon" aria-label="Merge supplier">
                   <GitMerge className="h-4 w-4" />
@@ -120,7 +120,7 @@ export default function SupplierDetailPage() {
             onConfirm={async () => {
               await deleteSupplier(supplier.id);
               toast.success("Supplier deleted");
-              navigate("/suppliers");
+              navigate("/records/suppliers");
             }}
           />
         </div>
@@ -172,7 +172,7 @@ export default function SupplierDetailPage() {
         <Truck className="h-4 w-4" />
         <h2 className="font-semibold">Deliveries</h2>
         <Button asChild variant="ghost" size="sm" className="ml-auto">
-          <Link to="/deliveries/new">
+          <Link to="/records/deliveries/new">
             <Plus className="mr-1 h-4 w-4" /> Add
           </Link>
         </Button>

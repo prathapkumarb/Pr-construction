@@ -160,8 +160,9 @@ export function computeReport(
     const value = lineTotals.get(d.id) ?? 0;
     totalSpend += value;
     supplierRow(d.supplierId).spend += value;
-    addMaterial(materialMap, d.materialName, d.unit, d.quantity, value);
-    addMaterial(supplierMaterials.get(d.supplierId)!, d.materialName, d.unit, d.quantity, value);
+    const numQty = typeof d.quantity === "number" ? d.quantity : 0;
+    addMaterial(materialMap, d.materialName, d.unit, numQty, value);
+    addMaterial(supplierMaterials.get(d.supplierId)!, d.materialName, d.unit, numQty, value);
   }
 
   let totalPayments = 0;

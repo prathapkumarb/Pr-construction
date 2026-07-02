@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
-import { BarChart3, Download, Loader2, IndianRupee, Wallet, Settings2, List } from "lucide-react";
+import { BarChart3, Download, Loader2, IndianRupee, Wallet, Settings2, List, HardHat } from "lucide-react";
 import { format as fmtDate, parseISO, startOfMonth } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useLedger } from "@/hooks/useLedger";
 import { useCollectionData } from "@/hooks/useCollectionData";
 import { buildRange, computeReport, type PeriodPreset } from "@/lib/reports";
+import type { LabourAttendance, LabourPayment } from "@/lib/labourTypes";
+import { labourAttendanceQuery, labourPaymentsQuery } from "@/services/labour";
 import { exportReportToExcel } from "@/lib/export";
 import { formatInr, formatNumber } from "@/lib/format";
 import type { UserDoc } from "@/lib/types";
@@ -117,6 +119,10 @@ export default function ReportsPage() {
   const { deliveries, financials, payments, suppliers, perSupplier, loading } = useLedger();
   const uQ = useMemo(() => usersQuery(), []);
   const { data: users } = useCollectionData<UserDoc>(uQ);
+  const laQ = useMemo(() => labourAttendanceQuery(), []);
+  const lpQ = useMemo(() => labourPaymentsQuery(), []);
+  const { data: labourAttendance } = useCollectionData<LabourAttendance>(laQ);
+  const { data: labourPayments } = useCollectionData<LabourPayment>(lpQ);
 
   // u.id is the injected Firestore doc ID (= Firebase UID) — always reliable
   const userNames = useMemo(() => new Map(users.map((u) => [u.id, u.name])), [users]);
@@ -175,7 +181,7 @@ export default function ReportsPage() {
           Material: d.materialName,
           Unit: d.unit,
           Qty: d.quantity,
-          "Rate (₹)": fin && d.quantity > 0 ? Math.round((fin.lineTotal / d.quantity) * 100) / 100 : "",
+          "Rate (₹)": fin && typeof d.quantity === "number" && d.quantity > 0 ? Math.round((fin.lineTotal / d.quantity) * 100) / 100 : "",
           "Value (₹)": fin ? fin.lineTotal : "",
           "Paid (₹)": st?.given ?? 0,
           "Balance (₹)": st?.balance ?? 0,
@@ -523,7 +529,7 @@ export default function ReportsPage() {
                   <tbody>
                     {periodDeliveries.map((d) => {
                       const fin = financialsById.get(d.id);
-                      const rate = fin && d.quantity > 0 ? fin.lineTotal / d.quantity : null;
+                      const rate = fin && typeof d.quantity === "number" && d.quantity > 0 ? fin.lineTotal / d.quantity : null;
                       const st = supplierTotalsMap.get(d.supplierId);
                       return (
                         <tr key={d.id} className="border-b last:border-0 hover:bg-muted/20">
@@ -585,6 +591,106 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Labour section ──────────────────────────────────────────────────── */}
+      {(() => {
+        const { start, end } = report.range;
+        const periodAttendance = labourAttendance.filter(
+          (r) => r.date >= start && r.date <= end,
+        );
+        const periodLabourPayments = labourPayments.filter(
+          (p) => p.date >= start && p.date <= end,
+        );
+
+        if (periodAttendance.length === 0 && periodLabourPayments.length === 0) return null;
+
+        // Per-worker attendance summary
+        const workerStats = new Map<string, { name: string; present: number; absent: number; ot: number }>();
+        for (const r of periodAttendance) {
+          const s = workerStats.get(r.workerId) ?? { name: r.workerName, present: 0, absent: 0, ot: 0 };
+          if (r.attendance === "present") s.present += 1;
+          else s.absent += 1;
+          s.ot += r.ot;
+          workerStats.set(r.workerId, s);
+        }
+        const statsRows = [...workerStats.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+        return (
+          <>
+            <div className="flex items-center gap-2 pt-2">
+              <HardHat className="h-4 w-4" />
+              <h2 className="text-sm font-semibold">Labour</h2>
+            </div>
+
+            {statsRows.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Attendance summary</CardTitle>
+                </CardHeader>
+                <CardContent className="px-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Worker</TableHead>
+                        <TableHead className="text-right">Present</TableHead>
+                        <TableHead className="text-right">Absent</TableHead>
+                        <TableHead className="text-right">OT days</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {statsRows.map((s) => (
+                        <TableRow key={s.name}>
+                          <TableCell className="font-medium">{s.name}</TableCell>
+                          <TableCell className="text-right tabular-nums text-emerald-700">{s.present}</TableCell>
+                          <TableCell className="text-right tabular-nums text-destructive">{s.absent}</TableCell>
+                          <TableCell className="text-right tabular-nums">{s.ot}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {periodLabourPayments.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Labour advances</CardTitle>
+                </CardHeader>
+                <CardContent className="px-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Worker</TableHead>
+                        <TableHead className="text-right">Advance</TableHead>
+                        <TableHead className="text-right">Rate/day</TableHead>
+                        <TableHead className="text-right">Deducted</TableHead>
+                        <TableHead className="text-right">Remaining</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {periodLabourPayments.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell className="font-medium">
+                            <p>{p.workerName}</p>
+                            <p className="text-xs text-muted-foreground">{safeDate(p.date)}</p>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">{formatInr(p.advance)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{formatInr(p.ratePerDay)}</TableCell>
+                          <TableCell className="text-right tabular-nums text-muted-foreground">{formatInr(p.deducted)}</TableCell>
+                          <TableCell className="text-right tabular-nums text-amber-700">
+                            {formatInr(p.advance - p.deducted)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }

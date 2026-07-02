@@ -32,7 +32,7 @@ function Header() {
         <h1 className="text-lg font-semibold">Deliveries</h1>
       </div>
       <Button asChild size="sm">
-        <Link to="/deliveries/new">
+        <Link to="/records/deliveries/new">
           <Plus className="mr-1 h-4 w-4" /> Add
         </Link>
       </Button>
@@ -47,7 +47,7 @@ function EmptyState() {
         <Truck className="h-8 w-8 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">No deliveries yet.</p>
         <Button asChild size="sm" variant="outline">
-          <Link to="/deliveries/new">Record the first one</Link>
+          <Link to="/records/deliveries/new">Record the first one</Link>
         </Button>
       </CardContent>
     </Card>
